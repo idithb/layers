@@ -1,5 +1,5 @@
 # Publishes the app to a Hugging Face Space on every push.
-# Setup (once): create a Docker Space on huggingface.co, then in this GitHub
+# Setup (once): create a Gradio Space (free) on huggingface.co, then in this GitHub
 # repo add the secret HF_TOKEN (a write token) and the variable HF_SPACE
 # (e.g. "username/layers") under Settings -> Secrets and variables -> Actions.
 name: Deploy to Hugging Face Space
@@ -25,10 +25,12 @@ jobs:
           test -n "$HF_TOKEN" || { echo "::error::HF_TOKEN secret is missing"; exit 1; }
           mkdir /tmp/space
           # Spaces reject plain-git binary files, so images/tests stay out
-          rsync -a --exclude .git --exclude .github --exclude samples --exclude tests --exclude output ./ /tmp/space/
+          rsync -a --exclude .git --exclude .github --exclude samples --exclude tests --exclude output \
+            --exclude Dockerfile --exclude .dockerignore ./ /tmp/space/
           cd /tmp/space
-          # The Space's README needs a config header
-          { printf -- '---\ntitle: Layers\nemoji: 🧅\ncolorFrom: indigo\ncolorTo: pink\nsdk: docker\napp_port: 7860\npinned: false\n---\n\n'; cat README.md; } > README.tmp
+          # The Space's README needs a config header. The Gradio SDK is free;
+          # space_app.py starts the FastAPI app on the port the Space expects.
+          { printf -- '---\ntitle: Layers\nemoji: 🧅\ncolorFrom: indigo\ncolorTo: pink\nsdk: gradio\nsdk_version: 6.29.0\npython_version: "3.11"\napp_file: space_app.py\npinned: false\n---\n\n'; cat README.md; } > README.tmp
           mv README.tmp README.md
           git init -q -b main
           git config user.name "github-actions"

@@ -12,17 +12,17 @@
 
 ## אתר אינטרנט (Hugging Face Spaces – חינם)
 
-הקוד כולל `Dockerfile` ו-GitHub Action שמעלה אותו אוטומטית ל-Space בכל עדכון.
+GitHub Action מעלה את הקוד אוטומטית ל-Space בכל עדכון. ה-Space משתמש ב-SDK של **Gradio** (חינמי; Docker דורש מנוי), ו-`space_app.py` מריץ בו את השרת הרגיל.
 הגדרה חד-פעמית:
 
-1. ב-huggingface.co: **New Space** → שם (למשל `layers`) → SDK: **Docker** → Blank → Hardware: **CPU basic (free)** → Public → Create.
+1. ב-huggingface.co: **New Space** → שם (למשל `layers`) → SDK: **Gradio** → Blank → Hardware: **CPU basic (free)** → Public → Create.
 2. ב-huggingface.co/settings/tokens: **Create new token** → סוג **Write** → העתק אותו.
 3. ב-GitHub, בריפו: **Settings → Secrets and variables → Actions**:
    - לשונית **Secrets** → New repository secret → שם `HF_TOKEN`, ערך: הטוקן.
    - לשונית **Variables** → New repository variable → שם `HF_SPACE`, ערך: `שם-המשתמש/layers`.
 4. ב-GitHub: **Actions → Deploy to Hugging Face Space → Run workflow**.
 
-אחרי כ-10-15 דקות של בנייה האתר זמין בכתובת `https://huggingface.co/spaces/<שם-המשתמש>/layers`.
+אחרי כ-10-15 דקות של בנייה (וכ-2 דקות בהפעלה הראשונה להורדת המודלים) האתר זמין בכתובת `https://huggingface.co/spaces/<שם-המשתמש>/layers`.
 מכאן כל push לענף מעדכן את האתר לבד.
 
 הערות: השרת החינמי (2 מעבדים, 16GB) מעבד תמונה בכ-1.5-3 דקות, ומשתמשים מחכים בתור אחד אחרי השני.
