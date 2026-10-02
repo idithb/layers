@@ -13,6 +13,7 @@ Off ZeroGPU (e.g. locally) @spaces.GPU is a no-op and everything runs on CPU.
 import os
 
 os.environ.setdefault("LAYERS_BIREFNET_BACKEND", "torch")
+os.environ.setdefault("LAYERS_DEVICE", "cpu")  # models wait on CPU between GPU calls
 os.environ["LAYERS_GRADIO"] = "1"
 
 import spaces  # noqa: E402  (must be imported before torch initialises CUDA)
@@ -85,6 +86,12 @@ with gr.Blocks(title="Layers API") as demo:
 
 demo.queue(default_concurrency_limit=1, max_size=20)
 app = gr.mount_gradio_app(app, demo, path="/gradio")
+
+# ZeroGPU registers the @spaces.GPU functions from a hook on gr.Blocks.launch();
+# since the app is served by uvicorn (to keep the editor at "/"), run it here.
+_zero_startup = getattr(getattr(spaces, "zero", None), "startup", None)
+if _zero_startup is not None:
+    _zero_startup()
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 7860)))

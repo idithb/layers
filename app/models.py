@@ -147,7 +147,10 @@ class LamaInpainter:
         import torch
 
         self.torch = torch
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # LAYERS_DEVICE=cpu forces loading on CPU (ZeroGPU reports CUDA as available
+        # at startup although a GPU is attached only during @spaces.GPU calls)
+        device = os.environ.get("LAYERS_DEVICE") or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(device)
         self.model = torch.jit.load(str(path), map_location=self.device).eval()
         self.max_size = max_size
 
