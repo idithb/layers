@@ -58,7 +58,7 @@ def _decode(data_url: str):
     return _read_image(base64.b64decode(data_url.split(",", 1)[-1]))
 
 
-@spaces.GPU(duration=60)
+@spaces.GPU(duration=30)
 def separate(image: str, detect_text: bool, detect_subject: bool, merge_text_lines: bool) -> dict:
     """Split an image (data URL) into background, subject and text layers."""
     img = _decode(image)
@@ -68,7 +68,7 @@ def separate(image: str, detect_text: bool, detect_subject: bool, merge_text_lin
         )
 
 
-@spaces.GPU(duration=60)
+@spaces.GPU(duration=30)
 def resize(background: str, width: int, height: int, mode: str) -> dict:
     """Resize the background (data URL); 'extend' paints the new margins with LaMa."""
     width, height = int(width), int(height)
