@@ -100,8 +100,8 @@ function blobToDataURL(blob) {
 let gradioClient = null;
 async function gradioApi(name, params, busyText) {
   if (!gradioClient) {
-    const { Client } = await import("/static/vendor/gradio-client.js");
-    gradioClient = await Client.connect(new URL("/gradio/", location.href).href);
+    const { Client } = await import("/ui/vendor/gradio-client.js");
+    gradioClient = await Client.connect(new URL("/", location.href).href);
   }
   const data = {};
   for (const [k, v] of Object.entries(params)) data[k] = v instanceof Blob ? await blobToDataURL(v) : v;

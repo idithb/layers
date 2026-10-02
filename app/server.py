@@ -37,7 +37,7 @@ MAX_QUEUE = int(os.environ.get("LAYERS_MAX_QUEUE", 20))
 JOB_TTL = 30 * 60  # finished results are kept for 30 minutes
 
 app = FastAPI(title="Layers")
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/ui", StaticFiles(directory=STATIC_DIR), name="ui")
 
 # One job at a time: each model run needs several GB of RAM on CPU
 _job_lock = asyncio.Lock()

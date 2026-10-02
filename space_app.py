@@ -5,8 +5,9 @@ and those functions must be called through Gradio. So:
   * the models are loaded on CPU at startup,
   * the two heavy operations are exposed as Gradio API endpoints that move the
     models to the GPU for the duration of the call,
-  * the regular editor (static/) is served at "/" and calls those endpoints
-    with the Gradio JS client (mounted at /gradio).
+  * Gradio is started with the standard launch() and the regular editor
+    (static/) is served at "/" on the same server; it calls the endpoints with
+    the Gradio JS client.
 Off ZeroGPU (e.g. locally) @spaces.GPU is a no-op and everything runs on CPU.
 """
 
@@ -25,12 +26,12 @@ import sys  # noqa: E402
 from contextlib import contextmanager  # noqa: E402
 
 import gradio as gr  # noqa: E402
-import uvicorn  # noqa: E402
 
 subprocess.run([sys.executable, "scripts/download_models.py"], check=True)
 
 from app import models  # noqa: E402
-from app.server import _read_image, _resize_job, _separate_job, app  # noqa: E402
+from app.server import _read_image, _resize_job, _separate_job  # noqa: E402
+from app.server import app as editor_app  # noqa: E402
 
 segmenter = models.get_segmenter()
 inpainter = models.get_inpainter()
@@ -85,13 +86,23 @@ with gr.Blocks(title="Layers API") as demo:
     gr.api(resize, api_name="resize", concurrency_id="gpu", concurrency_limit=1)
 
 demo.queue(default_concurrency_limit=1, max_size=20)
-app = gr.mount_gradio_app(app, demo, path="/gradio")
 
-# ZeroGPU registers the @spaces.GPU functions from a hook on gr.Blocks.launch();
-# since the app is served by uvicorn (to keep the editor at "/"), run it here.
-_zero_startup = getattr(getattr(spaces, "zero", None), "startup", None)
-if _zero_startup is not None:
-    _zero_startup()
+
+def _serve_editor_first(gradio_app) -> None:
+    """Put the editor's routes ("/", "/ui/...", "/api/status") ahead of Gradio's."""
+    ours = [r for r in editor_app.router.routes if getattr(r, "path", "") == "/" or
+            getattr(r, "path", "").startswith(("/ui", "/api/status"))]
+    for route in reversed(ours):
+        gradio_app.router.routes.insert(0, route)
+
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 7860)))
+    # The standard launch(): ZeroGPU registers the @spaces.GPU functions from it
+    demo.launch(
+        server_name=os.environ.get("GRADIO_SERVER_NAME", "0.0.0.0"),
+        server_port=int(os.environ.get("PORT", os.environ.get("GRADIO_SERVER_PORT", 7860))),
+        prevent_thread_lock=True,
+        ssr_mode=False,
+    )
+    _serve_editor_first(demo.app)
+    demo.block_thread()
