@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Layers – הפרדת תמונה לשכבות</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>Layers</h1>
+    <span class="sub">רקע · תמונה · טקסט</span>
+    <span id="status" class="status"></span>
+  </header>
+
+  <main>
+    <aside class="panel">
+      <section>
+        <h2>1. העלאת תמונה</h2>
+        <label class="drop" id="drop">
+          <input type="file" id="file" accept="image/*" hidden>
+          <span>גרור תמונה לכאן או לחץ לבחירה</span>
+        </label>
+        <label class="check"><input type="checkbox" id="optSubject" checked> הפרד תמונה (BiRefNet)</label>
+        <label class="check"><input type="checkbox" id="optText" checked> הפרד טקסט (OpenCV)</label>
+        <label class="check"><input type="checkbox" id="optMerge" checked> אחד שורות טקסט לפסקה</label>
+        <button id="btnSeparate" class="primary" disabled>הפרד לשכבות</button>
+      </section>
+
+      <section>
+        <h2>2. שכבות</h2>
+        <ul id="layers" class="layers"><li class="empty">אין שכבות עדיין</li></ul>
+        <div id="props" class="props" hidden>
+          <div class="row">
+            <label>X <input type="number" id="propX"></label>
+            <label>Y <input type="number" id="propY"></label>
+          </div>
+          <label>גודל <span id="propScaleVal">100%</span>
+            <input type="range" id="propScale" min="5" max="400" value="100">
+          </label>
+          <div class="row">
+            <button id="btnUp" title="הבא קדימה">▲</button>
+            <button id="btnDown" title="שלח אחורה">▼</button>
+            <button id="btnResetLayer">איפוס</button>
+          </div>
+          <div class="row">
+            <button id="btnFlatten" title="צייר את השכבה לתוך הרקע">מזג לרקע</button>
+            <button id="btnDelete" class="danger">מחק</button>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>3. גודל התמונה</h2>
+        <div class="presets" id="presets">
+          <button data-w="1080" data-h="1080">1:1</button>
+          <button data-w="1080" data-h="1350">4:5</button>
+          <button data-w="1080" data-h="1920">9:16</button>
+          <button data-w="1920" data-h="1080">16:9</button>
+          <button data-w="1200" data-h="628">באנר</button>
+        </div>
+        <div class="row">
+          <label>רוחב <input type="number" id="outW" min="16" max="4096"></label>
+          <label>גובה <input type="number" id="outH" min="16" max="4096"></label>
+        </div>
+        <label>אופן התאמת הרקע
+          <select id="resizeMode">
+            <option value="extend">הרחבה – LaMa משלים את השוליים</option>
+            <option value="cover">מילוי – חיתוך עודפים</option>
+            <option value="stretch">מתיחה</option>
+          </select>
+        </label>
+        <button id="btnResize" disabled>שנה גודל</button>
+      </section>
+
+      <section>
+        <h2>4. ייצוא</h2>
+        <button id="btnExport" class="primary" disabled>הורד PNG</button>
+        <button id="btnExportLayers" disabled>הורד שכבות בנפרד</button>
+      </section>
+    </aside>
+
+    <section class="stage" id="stage">
+      <canvas id="canvas" width="800" height="500"></canvas>
+      <div id="placeholder" class="placeholder">העלה תמונה כדי להתחיל</div>
+      <div id="busy" class="busy" hidden><div class="spinner"></div><span id="busyText">מעבד…</span></div>
+      <div id="dims" class="dims"></div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

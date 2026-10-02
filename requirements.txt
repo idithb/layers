@@ -1,0 +1,10 @@
+numpy
+opencv-python-headless
+pillow
+fastapi
+uvicorn
+python-multipart
+# BiRefNet (ONNX)
+onnxruntime
+# LaMa (TorchScript)
+torch
