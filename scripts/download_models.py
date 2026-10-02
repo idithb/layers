@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.models import MODEL_URLS, MODELS_DIR  # noqa: E402
+from app.models import BIREFNET_PATH, MODEL_URLS, MODELS_DIR, SEGMENTER_BACKEND  # noqa: E402
 
 
 def download(url: str, dest: Path) -> None:
@@ -32,6 +32,8 @@ def main() -> None:
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     for name, url in MODEL_URLS.items():
         dest = MODELS_DIR / name
+        if name == BIREFNET_PATH.name and SEGMENTER_BACKEND == "torch":
+            continue  # the torch backend loads BiRefNet from the Hugging Face Hub
         if dest.exists():
             print(f"✓ {name} already exists")
             continue

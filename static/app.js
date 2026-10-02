@@ -66,9 +66,19 @@ async function fetchJSON(path, options) {
   return res.json();
 }
 
+// The server runs either our own job queue (/api/*, local) or the Gradio API
+// (Hugging Face ZeroGPU Space, where the GPU is only available through Gradio).
+const backend = fetchJSON("/api/status").then((s) => s.backend).catch(() => "jobs");
+
+async function api(name, params, busyText) {
+  return (await backend) === "gradio" ? gradioApi(name, params, busyText) : jobsApi(name, params, busyText);
+}
+
 // Submit a job, then poll until it finishes (processing can take minutes)
-async function api(path, form, busyText) {
-  const { job } = await fetchJSON(path, { method: "POST", body: form });
+async function jobsApi(name, params, busyText) {
+  const form = new FormData();
+  for (const [k, v] of Object.entries(params)) form.append(k, v);
+  const { job } = await fetchJSON(`/api/${name}`, { method: "POST", body: form });
   for (;;) {
     await new Promise((r) => setTimeout(r, 1500));
     const s = await fetchJSON(`/api/jobs/${job}`);
@@ -76,6 +86,36 @@ async function api(path, form, busyText) {
     if (s.status === "error") throw new Error(s.error);
     setBusy(true, s.ahead > 0 ? `ממתין בתור – ${s.ahead} לפניך…` : busyText);
   }
+}
+
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+
+let gradioClient = null;
+async function gradioApi(name, params, busyText) {
+  if (!gradioClient) {
+    const { Client } = await import("/static/vendor/gradio-client.js");
+    gradioClient = await Client.connect(new URL("/gradio/", location.href).href);
+  }
+  const data = {};
+  for (const [k, v] of Object.entries(params)) data[k] = v instanceof Blob ? await blobToDataURL(v) : v;
+  const job = gradioClient.submit(`/${name}`, data);
+  for await (const msg of job) {
+    if (msg.type === "status") {
+      if (msg.stage === "error") throw new Error(msg.message || "שגיאה בשרת");
+      if (msg.stage === "pending" && msg.position > 0) setBusy(true, `ממתין בתור – ${msg.position} לפניך…`);
+      else setBusy(true, busyText);
+    } else if (msg.type === "data") {
+      return msg.data[0];
+    }
+  }
+  throw new Error("no result");
 }
 
 function download(href, name) {
@@ -364,15 +404,16 @@ $("stage").addEventListener("drop", (e) => { e.preventDefault(); setFile(e.dataT
 
 $("btnSeparate").onclick = async () => {
   if (!state.file) return;
-  const form = new FormData();
-  form.append("image", state.file);
-  form.append("detect_subject", $("optSubject").checked);
-  form.append("detect_text", $("optText").checked);
-  form.append("merge_text_lines", $("optMerge").checked);
+  const params = {
+    image: state.file,
+    detect_text: $("optText").checked,
+    detect_subject: $("optSubject").checked,
+    merge_text_lines: $("optMerge").checked,
+  };
   const busyText = "מפריד שכבות… (זה יכול לקחת דקה-שתיים)";
   setBusy(true, busyText);
   try {
-    const data = await api("/api/separate", form, busyText);
+    const data = await api("separate", params, busyText);
     state.width = data.width;
     state.height = data.height;
     state.background = await loadImage(data.background);
@@ -425,15 +466,16 @@ $("btnResize").onclick = async () => {
     alert("הגודל צריך להיות בין 16 ל-4096 פיקסלים");
     return;
   }
-  const form = new FormData();
-  form.append("background", await canvasToBlob(imageToCanvas(state.background, state.width, state.height)), "bg.png");
-  form.append("width", w);
-  form.append("height", h);
-  form.append("mode", $("resizeMode").value);
+  const params = {
+    background: await canvasToBlob(imageToCanvas(state.background, state.width, state.height)),
+    width: w,
+    height: h,
+    mode: $("resizeMode").value,
+  };
   const busyText = "משנה גודל ומשלים רקע…";
   setBusy(true, busyText);
   try {
-    const data = await api("/api/resize", form, busyText);
+    const data = await api("resize", params, busyText);
     const t = data.transform;
     const s = Math.min(t.sx, t.sy);
     for (const l of state.layers) {

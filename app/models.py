@@ -23,6 +23,9 @@ MODELS_DIR = Path(os.environ.get("LAYERS_MODELS_DIR", Path(__file__).resolve().p
 BIREFNET_PATH = MODELS_DIR / "birefnet-general.onnx"
 LAMA_PATH = MODELS_DIR / "big-lama.pt"
 
+# "onnx" (default, CPU-friendly local file) or "torch" (Hub weights, for GPUs)
+SEGMENTER_BACKEND = os.environ.get("LAYERS_BIREFNET_BACKEND", "onnx")
+
 MODEL_URLS = {
     BIREFNET_PATH.name: "https://github.com/danielgatis/rembg/releases/download/v0.0.0/BiRefNet-general-epoch_244.onnx",
     LAMA_PATH.name: "https://github.com/enesmsahin/simple-lama-inpainting/releases/download/v0.1.0/big-lama.pt",
@@ -69,6 +72,39 @@ class BiRefNetSegmenter:
         return cv2.resize(pred.astype(np.float32), (W, H), interpolation=cv2.INTER_LINEAR).clip(0, 1)
 
 
+class TorchBiRefNetSegmenter:
+    """BiRefNet in PyTorch from the Hugging Face Hub (for GPUs, e.g. ZeroGPU Spaces)."""
+
+    size = 1024
+    repo = "ZhengPeng7/BiRefNet"
+
+    def __init__(self):
+        import torch
+        from transformers import AutoModelForImageSegmentation
+
+        self.torch = torch
+        torch.set_float32_matmul_precision("high")
+        self.model = AutoModelForImageSegmentation.from_pretrained(self.repo, trust_remote_code=True).eval()
+        self.device = torch.device("cpu")
+
+    def to(self, device) -> None:
+        self.device = self.torch.device(device)
+        self.model.to(self.device)
+        # half precision on GPU, as in the model card
+        self.model.half() if self.device.type == "cuda" else self.model.float()
+
+    def predict(self, img_rgb: np.ndarray) -> np.ndarray:
+        torch = self.torch
+        H, W = img_rgb.shape[:2]
+        x = cv2.resize(img_rgb, (self.size, self.size), interpolation=cv2.INTER_LINEAR).astype(np.float32) / 255.0
+        x = (x - np.array([0.485, 0.456, 0.406], np.float32)) / np.array([0.229, 0.224, 0.225], np.float32)
+        t = torch.from_numpy(x.transpose(2, 0, 1)[None]).to(self.device)
+        t = t.half() if self.device.type == "cuda" else t
+        with torch.inference_mode():
+            pred = self.model(t)[-1].sigmoid().float()[0, 0].cpu().numpy()
+        return cv2.resize(pred, (W, H), interpolation=cv2.INTER_LINEAR).clip(0, 1)
+
+
 class LamaInpainter:
     """Big-LaMa TorchScript model."""
 
@@ -81,6 +117,10 @@ class LamaInpainter:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = torch.jit.load(str(path), map_location=self.device).eval()
         self.max_size = max_size
+
+    def to(self, device) -> None:
+        self.device = self.torch.device(device)
+        self.model.to(self.device)
 
     def _run(self, img: np.ndarray, mask: np.ndarray) -> np.ndarray:
         torch = self.torch
@@ -174,13 +214,17 @@ _segmenter: BiRefNetSegmenter | None | bool = False  # False = not tried yet
 _inpainter = None
 
 
-def get_segmenter() -> BiRefNetSegmenter | None:
+def get_segmenter():
     global _segmenter
     with _lock:
         if _segmenter is False:
             try:
-                _segmenter = BiRefNetSegmenter()
-                log.info("BiRefNet loaded from %s", BIREFNET_PATH)
+                if SEGMENTER_BACKEND == "torch":
+                    _segmenter = TorchBiRefNetSegmenter()
+                    log.info("BiRefNet loaded from the Hub (%s)", TorchBiRefNetSegmenter.repo)
+                else:
+                    _segmenter = BiRefNetSegmenter()
+                    log.info("BiRefNet loaded from %s", BIREFNET_PATH)
             except Exception as e:  # noqa: BLE001
                 log.warning("BiRefNet unavailable (%s); subject layer disabled", e)
                 _segmenter = None
@@ -202,7 +246,7 @@ def get_inpainter():
 
 def status() -> dict:
     return {
-        "birefnet": BIREFNET_PATH.exists(),
+        "birefnet": SEGMENTER_BACKEND == "torch" or BIREFNET_PATH.exists(),
         "lama": LAMA_PATH.exists(),
         "models_dir": str(MODELS_DIR),
     }

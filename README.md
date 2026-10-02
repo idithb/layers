@@ -12,7 +12,7 @@
 
 ## אתר אינטרנט (Hugging Face Spaces – חינם)
 
-GitHub Action מעלה את הקוד אוטומטית ל-Space בכל עדכון. ה-Space משתמש ב-SDK של **Gradio** (חינמי; Docker דורש מנוי), ו-`space_app.py` מריץ בו את השרת הרגיל.
+GitHub Action מעלה את הקוד אוטומטית ל-Space בכל עדכון. ה-Space משתמש ב-SDK של **Gradio** עם **ZeroGPU** (חינמי; Docker ו-CPU דורשים מנוי). `space_app.py` מגיש את העורך, וטוען את המודלים ל-GPU רק בזמן עיבוד (דרך `@spaces.GPU`). BiRefNet נטען שם ב-PyTorch מה-Hub (`ZhengPeng7/BiRefNet`) במקום ONNX.
 הגדרה חד-פעמית:
 
 1. ב-huggingface.co: **New Space** → שם (למשל `layers`) → SDK: **Gradio** → Blank → Hardware: **CPU basic (free)** → Public → Create.
@@ -25,7 +25,7 @@ GitHub Action מעלה את הקוד אוטומטית ל-Space בכל עדכון
 אחרי כ-10-15 דקות של בנייה (וכ-2 דקות בהפעלה הראשונה להורדת המודלים) האתר זמין בכתובת `https://huggingface.co/spaces/<שם-המשתמש>/layers`.
 מכאן כל push לענף מעדכן את האתר לבד.
 
-הערות: השרת החינמי (2 מעבדים, 16GB) מעבד תמונה בכ-1.5-3 דקות, ומשתמשים מחכים בתור אחד אחרי השני.
+הערות: על GPU עיבוד תמונה לוקח שניות בודדות. ל-ZeroGPU יש מכסה יומית לכל מבקר (מבקרים מחוברים ל-Hugging Face מקבלים יותר); משתמשים מחכים בתור אחד אחרי השני.
 Space שלא היה בו שימוש 48 שעות "נרדם" ומתעורר בכניסה הבאה (כדקה).
 
 ## התקנה מקומית

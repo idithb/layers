@@ -1,0 +1,15 @@
+# Requirements for the Hugging Face Space (Gradio SDK + ZeroGPU).
+# The deploy workflow installs this file as the Space's requirements.txt;
+# gradio itself comes from the Space's sdk_version.
+numpy
+opencv-python-headless
+pillow
+fastapi
+uvicorn
+spaces
+torch
+# BiRefNet from the Hub (trust_remote_code)
+transformers>=4.44,<5
+timm
+kornia
+einops

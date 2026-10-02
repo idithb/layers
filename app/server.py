@@ -136,7 +136,8 @@ def index():
 
 @app.get("/api/status")
 def api_status():
-    return models.status()
+    # "gradio": processing goes through the Gradio API (ZeroGPU Space), see space_app.py
+    return {**models.status(), "backend": "gradio" if os.environ.get("LAYERS_GRADIO") else "jobs"}
 
 
 @app.post("/api/separate")
