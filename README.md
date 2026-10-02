@@ -12,7 +12,7 @@
 
 ## אתר אינטרנט (Hugging Face Spaces – חינם)
 
-GitHub Action מעלה את הקוד אוטומטית ל-Space בכל עדכון. ה-Space משתמש ב-SDK של **Gradio** עם **ZeroGPU** (חינמי; Docker ו-CPU דורשים מנוי). `space_app.py` מגיש את העורך, וטוען את המודלים ל-GPU רק בזמן עיבוד (דרך `@spaces.GPU`). BiRefNet נטען שם ב-PyTorch מה-Hub (`ZhengPeng7/BiRefNet`) במקום ONNX.
+GitHub Action מעלה את הקוד אוטומטית ל-Space בכל עדכון. ה-Space משתמש ב-SDK של **Gradio** עם **ZeroGPU** (חינמי; Docker ו-CPU דורשים מנוי). `space_app.py` מגיש את העורך, וטוען את המודלים ל-GPU רק בזמן עיבוד (דרך `@spaces.GPU`). BiRefNet רץ שם ב-PyTorch מהקוד המקורי ([ZhengPeng7/BiRefNet](https://github.com/ZhengPeng7/BiRefNet), commit נעוץ) עם אותם משקלים כמו קובץ ה-ONNX.
 הגדרה חד-פעמית:
 
 1. ב-huggingface.co: **New Space** → שם (למשל `layers`) → SDK: **Gradio** → Blank → Hardware: **CPU basic (free)** → Public → Create.

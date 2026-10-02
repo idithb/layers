@@ -11,6 +11,8 @@ from __future__ import annotations
 import ctypes
 import logging
 import os
+import sys
+import types
 import threading
 from pathlib import Path
 
@@ -22,8 +24,12 @@ log = logging.getLogger(__name__)
 MODELS_DIR = Path(os.environ.get("LAYERS_MODELS_DIR", Path(__file__).resolve().parent.parent / "models"))
 BIREFNET_PATH = MODELS_DIR / "birefnet-general.onnx"
 LAMA_PATH = MODELS_DIR / "big-lama.pt"
+BIREFNET_PTH = MODELS_DIR / "birefnet-general.pth"
+BIREFNET_SRC_DIR = MODELS_DIR / "BiRefNet-src"
+BIREFNET_SRC_COMMIT = "ebcc0bc8ec7fe919cec829f2dea656b3078acddc"
+BIREFNET_SRC_REPO = "https://github.com/ZhengPeng7/BiRefNet"
 
-# "onnx" (default, CPU-friendly local file) or "torch" (Hub weights, for GPUs)
+# "onnx" (default, CPU-friendly) or "torch" (PyTorch, for GPUs)
 SEGMENTER_BACKEND = os.environ.get("LAYERS_BIREFNET_BACKEND", "onnx")
 
 MODEL_URLS = {
@@ -73,18 +79,45 @@ class BiRefNetSegmenter:
 
 
 class TorchBiRefNetSegmenter:
-    """BiRefNet in PyTorch from the Hugging Face Hub (for GPUs, e.g. ZeroGPU Spaces)."""
+    """BiRefNet in PyTorch (for GPUs, e.g. ZeroGPU Spaces).
+
+    Uses the original model code from github.com/ZhengPeng7/BiRefNet (pinned
+    commit, MIT) with the same "general" weights as the ONNX file, both
+    fetched by scripts/download_models.py. This avoids `transformers`, whose
+    huggingface-hub pin conflicts with Gradio's.
+    """
 
     size = 1024
-    repo = "ZhengPeng7/BiRefNet"
 
-    def __init__(self):
+    def __init__(self, src_dir: Path | None = None, weights: Path | None = None):
         import torch
-        from transformers import AutoModelForImageSegmentation
 
         self.torch = torch
+        src_dir = src_dir or BIREFNET_SRC_DIR
+        weights = weights or BIREFNET_PTH
+        # The repo uses top-level module names (config, dataset, models); import
+        # them from its folder without clashing with anything already loaded.
+        names = ("config", "dataset", "models")
+        saved = {n: sys.modules.pop(n) for n in names if n in sys.modules}
+        sys.path.insert(0, str(src_dir))
+        # dataset.py is training-only (needs torchvision); inference only needs
+        # the label list, used when auxiliary classification is on (it is off).
+        sys.modules["dataset"] = types.SimpleNamespace(class_labels_TR_sorted=[])
+        try:
+            from models.birefnet import BiRefNet
+        finally:
+            sys.path.remove(str(src_dir))
+            for n in names:
+                sys.modules.pop(n, None)
+            sys.modules.update(saved)
+
         torch.set_float32_matmul_precision("high")
-        self.model = AutoModelForImageSegmentation.from_pretrained(self.repo, trust_remote_code=True).eval()
+        self.model = BiRefNet(bb_pretrained=False)
+        state = torch.load(str(weights), map_location="cpu", weights_only=True)
+        for prefix in ("module.", "_orig_mod."):
+            state = {k[len(prefix):] if k.startswith(prefix) else k: v for k, v in state.items()}
+        self.model.load_state_dict(state)
+        self.model.eval()
         self.device = torch.device("cpu")
 
     def to(self, device) -> None:
@@ -221,7 +254,7 @@ def get_segmenter():
             try:
                 if SEGMENTER_BACKEND == "torch":
                     _segmenter = TorchBiRefNetSegmenter()
-                    log.info("BiRefNet loaded from the Hub (%s)", TorchBiRefNetSegmenter.repo)
+                    log.info("BiRefNet (PyTorch) loaded from %s", BIREFNET_PTH)
                 else:
                     _segmenter = BiRefNetSegmenter()
                     log.info("BiRefNet loaded from %s", BIREFNET_PATH)
@@ -246,7 +279,7 @@ def get_inpainter():
 
 def status() -> dict:
     return {
-        "birefnet": SEGMENTER_BACKEND == "torch" or BIREFNET_PATH.exists(),
+        "birefnet": (BIREFNET_PTH if SEGMENTER_BACKEND == "torch" else BIREFNET_PATH).exists(),
         "lama": LAMA_PATH.exists(),
         "models_dir": str(MODELS_DIR),
     }
