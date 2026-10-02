@@ -19,13 +19,12 @@ def download(url: str, dest: Path) -> None:
 
     def progress(blocks: int, block_size: int, total: int) -> None:
         if total > 0:
-            pct = min(100, blocks * block_size * 100 // total)
+            pct = min(100, blocks * block_size * 100 // total) // 10 * 10
             if pct != last[0]:
                 last[0] = pct
-                print(f"\r   {pct:3d}%  of {total / 1e6:.1f} MB", end="", flush=True)
+                print(f"   {pct:3d}%  of {total / 1e6:.1f} MB", flush=True)
 
     urllib.request.urlretrieve(url, tmp, progress)
-    print()
     tmp.rename(dest)
 
 
