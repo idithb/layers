@@ -10,7 +10,25 @@
 | רקע | **LaMa** (Big-LaMa) | ציור מחדש של מה שהיה מאחורי הטקסט והאובייקטים, כולל הצל שלהם |
 | שינוי גודל | **LaMa** | במצב "הרחבה" – השלמת השוליים החדשים (outpainting) |
 
-## התקנה
+## אתר אינטרנט (Hugging Face Spaces – חינם)
+
+הקוד כולל `Dockerfile` ו-GitHub Action שמעלה אותו אוטומטית ל-Space בכל עדכון.
+הגדרה חד-פעמית:
+
+1. ב-huggingface.co: **New Space** → שם (למשל `layers`) → SDK: **Docker** → Blank → Hardware: **CPU basic (free)** → Public → Create.
+2. ב-huggingface.co/settings/tokens: **Create new token** → סוג **Write** → העתק אותו.
+3. ב-GitHub, בריפו: **Settings → Secrets and variables → Actions**:
+   - לשונית **Secrets** → New repository secret → שם `HF_TOKEN`, ערך: הטוקן.
+   - לשונית **Variables** → New repository variable → שם `HF_SPACE`, ערך: `שם-המשתמש/layers`.
+4. ב-GitHub: **Actions → Deploy to Hugging Face Space → Run workflow**.
+
+אחרי כ-10-15 דקות של בנייה האתר זמין בכתובת `https://huggingface.co/spaces/<שם-המשתמש>/layers`.
+מכאן כל push לענף מעדכן את האתר לבד.
+
+הערות: השרת החינמי (2 מעבדים, 16GB) מעבד תמונה בכ-1.5-3 דקות, ומשתמשים מחכים בתור אחד אחרי השני.
+Space שלא היה בו שימוש 48 שעות "נרדם" ומתעורר בכניסה הבאה (כדקה).
+
+## התקנה מקומית
 
 ```bash
 pip install -r requirements.txt
@@ -52,8 +70,9 @@ uvicorn app.server:app --port 8000
 
 | נקודה | קלט | פלט |
 |---|---|---|
-| `POST /api/separate` | `image`, `detect_text`, `detect_subject`, `merge_text_lines` | רקע + שכבות כ-PNG (data URL) עם מיקום |
-| `POST /api/resize` | `background`, `width`, `height`, `mode` (`extend`/`cover`/`stretch`) | רקע חדש + `transform` (`sx, sy, ox, oy`) להזזת השכבות |
+| `POST /api/separate` | `image`, `detect_text`, `detect_subject`, `merge_text_lines` | `{job}` – מזהה עבודה |
+| `POST /api/resize` | `background`, `width`, `height`, `mode` (`extend`/`cover`/`stretch`) | `{job}` |
+| `GET /api/jobs/{job}` | – | `queued`/`running` (+ מקום בתור), `error`, או `done` + תוצאה: רקע + שכבות כ-PNG עם מיקום / רקע חדש + `transform` (`sx, sy, ox, oy`) |
 | `GET /api/status` | – | אילו מודלים קיימים |
 
 ## מבנה

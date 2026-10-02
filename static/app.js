@@ -56,14 +56,26 @@ function setStatus(text) {
   $("status").textContent = text;
 }
 
-async function api(path, form) {
-  const res = await fetch(path, { method: "POST", body: form });
+async function fetchJSON(path, options) {
+  const res = await fetch(path, options);
   if (!res.ok) {
     let msg = res.statusText;
     try { msg = (await res.json()).detail || msg; } catch (_) {}
     throw new Error(msg);
   }
   return res.json();
+}
+
+// Submit a job, then poll until it finishes (processing can take minutes)
+async function api(path, form, busyText) {
+  const { job } = await fetchJSON(path, { method: "POST", body: form });
+  for (;;) {
+    await new Promise((r) => setTimeout(r, 1500));
+    const s = await fetchJSON(`/api/jobs/${job}`);
+    if (s.status === "done") return s.result;
+    if (s.status === "error") throw new Error(s.error);
+    setBusy(true, s.ahead > 0 ? `ממתין בתור – ${s.ahead} לפניך…` : busyText);
+  }
 }
 
 function download(href, name) {
@@ -357,9 +369,10 @@ $("btnSeparate").onclick = async () => {
   form.append("detect_subject", $("optSubject").checked);
   form.append("detect_text", $("optText").checked);
   form.append("merge_text_lines", $("optMerge").checked);
-  setBusy(true, "מפריד שכבות… (בהרצה ראשונה המודלים נטענים)");
+  const busyText = "מפריד שכבות… (זה יכול לקחת דקה-שתיים)";
+  setBusy(true, busyText);
   try {
-    const data = await api("/api/separate", form);
+    const data = await api("/api/separate", form, busyText);
     state.width = data.width;
     state.height = data.height;
     state.background = await loadImage(data.background);
@@ -417,9 +430,10 @@ $("btnResize").onclick = async () => {
   form.append("width", w);
   form.append("height", h);
   form.append("mode", $("resizeMode").value);
-  setBusy(true, "משנה גודל ומשלים רקע…");
+  const busyText = "משנה גודל ומשלים רקע…";
+  setBusy(true, busyText);
   try {
-    const data = await api("/api/resize", form);
+    const data = await api("/api/resize", form, busyText);
     const t = data.transform;
     const s = Math.min(t.sx, t.sy);
     for (const l of state.layers) {
@@ -475,5 +489,5 @@ fetch("/api/status").then((r) => r.json()).then((s) => {
   const missing = [];
   if (!s.birefnet) missing.push("BiRefNet");
   if (!s.lama) missing.push("LaMa");
-  setStatus(missing.length ? `חסרים מודלים: ${missing.join(", ")} – הרץ scripts/download_models.py` : "מודלים מוכנים");
+  if (missing.length) setStatus(`חסרים מודלים: ${missing.join(", ")} – הרץ scripts/download_models.py`);
 }).catch(() => {});
